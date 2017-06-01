@@ -87,7 +87,7 @@ def read_simulation(name_file):
   
   
 def read_controls(name_file,var_list,limits):
-  """ Infer contraints from data.
+  """ Infer contraints from data
 
   INPUTS
   ------
@@ -95,7 +95,7 @@ def read_controls(name_file,var_list,limits):
   name_file: string 
     Name of the files used as contraints
   var_list: list
-    Variables used
+    Variables used [a,i,RAAN,...]
 
   RETURN
   ------
@@ -105,9 +105,13 @@ def read_controls(name_file,var_list,limits):
 
   """
 
+  #the number of objects in the future population
   nb_obj = 500
+
+  #controls empty
   frequencies = {}
-  
+
+  #read the files containing the contraints
   f = open(name_file,'r')
   data = f.readlines()
   f.close()
@@ -119,14 +123,15 @@ def read_controls(name_file,var_list,limits):
       population.append(row.strip().split())
   population = pd.DataFrame(population,columns=headers)
      
-  fig = plt.figure(figsize=(10,16))
+  fig = plt.figure(figsize=(10,8))
 
   for k,var in enumerate(var_list):
 
+    #we select only the objects with the tag 'EKRAN_2_DEB'
     flag = population['NAME']=='EKRAN_2_DEB'
     var_data = [float(i) for i in population[var][flag].tolist()]
 
-    ax = fig.add_subplot(4,1,k+1)
+    ax = fig.add_subplot(2,2,k+1)
     ax.grid(True)
     ax.set_title(var)
     #ax.hist(var_data,bins=25)
@@ -214,16 +219,28 @@ def pop_2_cross_table(population,var_list,n_dim):
 
     """
 
+    fig = plt.figure(figsize=(10,8))
+    
     bounds = {}
     limits = {}
     frequencies = {}
+    k=0
     for var in var_list:
       population[var] = population[var].convert_objects(convert_numeric=True)
       bounds[var],limits[var] = pd.cut(population[var],n_dim,retbins=True,labels=False)
       counts = pd.value_counts(bounds[var])
       counts = [counts.loc[i] for i in range(0,len(counts),1)]
       frequencies[var] = counts
-            
+
+      ax = fig.add_subplot(2,2,k+1)
+      k += 1
+      ax.grid(True)
+      ax.set_title(var)
+      plt.hist(frequencies[var],bins=5)
+      
+    plt.savefig('new_frequencies')
+    plt.close()
+    
     cross_table = np.zeros((n_dim,n_dim,n_dim,n_dim)) 
     for i in range(0,len(limits['a[m]'])-1,1):
       for j in range(0,len(limits['i[deg]'])-1,1):
@@ -314,22 +331,18 @@ def update_variable_cross_table(cross_table,frequency,controls):
   for i in range(0,len(frequency['a[m]']),1):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):
-        for l in range(0,len(frequency['BC[m2/kg]']),1):       
+        for l in range(0,len(frequency['BC[m2/kg]']),1):
           cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['a[m]'][i]/frequency['a[m]'][i]
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
           new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
   frequency = new_frequency.copy()
-
-  print '-----'
-  print frequency['RAAN[deg]']
-  print '-----'
   
   new_frequency = frequency.copy()
   for item in new_frequency:
     dim = len(new_frequency[item])
-    new_frequency[item] = np.zeros(dim).tolist()
+    new_frequency[item] = np.zeros(dim).tolist()  
   for i in range(0,len(frequency['a[m]']),1):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):      
@@ -338,14 +351,9 @@ def update_variable_cross_table(cross_table,frequency,controls):
           cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['i[deg]'][j]/frequency['i[deg]'][j]
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]      
-          new_frequency['RAAN[deg]'][k] += cross_table[i,j,k]
+          new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
           new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
-  frequency = new_frequency.copy()
-
-  print '-----'
-  print frequency['RAAN[deg]']
-  print '-----'
-  
+  frequency = new_frequency.copy() 
   
   new_frequency = frequency.copy()
   for item in new_frequency:
@@ -377,6 +385,7 @@ def update_variable_cross_table(cross_table,frequency,controls):
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
           new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
   frequency = new_frequency.copy()
+
   
   return cross_table,new_frequency
   
@@ -390,17 +399,18 @@ def cross_table_2_pop(cross_table,frequencies,limits,var_list):
   for i in range(0,len(frequencies['a[m]']),1):
     for j in range(0,len(frequencies['i[deg]']),1):
       for k in range(0,len(frequencies['RAAN[deg]']),1):
-        counter = 0
-        while counter<cross_table[i,j,k]:
-          sma = limits['a[m]'][i] + (limits['a[m]'][i+1]-limits['a[m]'][i])*random()
-          ecc = 0.1*random()
-          inc = limits['i[deg]'][i] + (limits['i[deg]'][i+1]-limits['i[deg]'][i])*random()
-          raan = limits['RAAN[deg]'][i] + (limits['RAAN[deg]'][i+1]-limits['RAAN[deg]'][i])*random()        
-          omega = 360.*random()
-          ma = 360.*random()
-          bc = limits['BC[m2/kg]'][i] + (limits['BC[m2/kg]'][i+1]-limits['BC[m2/kg]'][i])*random()
-          population.append([sma,ecc,inc,raan,omega,ma,bc])
-          counter += 1
+        for k in range(0,len(frequencies['RAAN[deg]']),1):
+          counter = 0
+          while counter<cross_table[i,j,k,l]:
+            sma = limits['a[m]'][i] + (limits['a[m]'][i+1]-limits['a[m]'][i])*random()
+            ecc = 0.1*random()
+            inc = limits['i[deg]'][j] + (limits['i[deg]'][j+1]-limits['i[deg]'][j])*random()
+            raan = limits['RAAN[deg]'][k] + (limits['RAAN[deg]'][k+1]-limits['RAAN[deg]'][k])*random()        
+            omega = 360.*random()
+            ma = 360.*random()
+            bc = limits['BC[m2/kg]'][l] + (limits['BC[m2/kg]'][l+1]-limits['BC[m2/kg]'][l])*random()
+            population.append([sma,ecc,inc,raan,omega,ma,bc])
+            counter += 1
   
   #['a[m]', 'e[-]', 'i[deg]', 'RAAN[deg]', 'Omega[deg]', 'MA[deg]', 'BC[m2/kg]', 'S[m]', 'IDNORAD', 'NAME']      
   headers = ['a[m]', 'e[-]', 'i[deg]', 'RAAN[deg]', 'Omega[deg]', 'MA[deg]', 'BC[m2/kg]']
@@ -420,7 +430,7 @@ print population['BC[m2/kg]'].min()
 # SECOND STEP: create the cross-table
 
 var_list = ['a[m]','i[deg]','RAAN[deg]','BC[m2/kg]']
-n_dim = 5
+n_dim = 4
 cross_table,frequencies,limits = pop_2_cross_table(population,var_list,n_dim)
 #print 'Cross-table'
 #print cross_table
