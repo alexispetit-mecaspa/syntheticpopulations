@@ -10,6 +10,7 @@
   This scrip analyses a population of space debris in the GEO region.
 """
 
+import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -62,7 +63,11 @@ def read_simulation(name_file):
         category[name] = 1
     else:
         category[name] += 1
-  print category
+
+  print
+  print '> Categories in the simulation:'      
+  print '> ',category
+  print
 
   plt.title(date.strftime('%y/%m/%d'),fontsize=14)
   plt.grid(True)
@@ -96,6 +101,7 @@ def read_controls(name_file,var_list,limits):
     Name of the files used as contraints
   var_list: list
     Variables used [a,i,RAAN,...]
+  limits: list
 
   RETURN
   ------
@@ -106,7 +112,7 @@ def read_controls(name_file,var_list,limits):
   """
 
   #the number of objects in the future population
-  nb_obj = 500
+  nb_obj = 1000
 
   #controls empty
   frequencies = {}
@@ -122,7 +128,8 @@ def read_controls(name_file,var_list,limits):
     if 'GEOTEST' not in row:
       population.append(row.strip().split())
   population = pd.DataFrame(population,columns=headers)
-     
+
+  print '> Plot the distribution (constraints)' 
   fig = plt.figure(figsize=(10,8))
 
   for k,var in enumerate(var_list):
@@ -233,10 +240,15 @@ def pop_2_cross_table(population,var_list,n_dim):
       frequencies[var] = counts
 
       ax = fig.add_subplot(2,2,k+1)
+      data_max = len(population[var])     
+      (mu, sigma) = norm.fit(population[var])
+      n, bins, patches = plt.hist(population[var],50,normed=1,facecolor='green',alpha=0.75)
+      y = mlab.normpdf(bins,mu,sigma)#*data_max
+      plt.plot(bins,y,'r--', linewidth=2)
+          
       k += 1
       ax.grid(True)
       ax.set_title(var)
-      plt.hist(frequencies[var],bins=5)
       
     plt.savefig('new_frequencies')
     plt.close()
@@ -420,20 +432,22 @@ def cross_table_2_pop(cross_table,frequencies,limits,var_list):
 
 
 # FIRST STEP: read the population coming from our simulation
-  
+print
+print 'Read the data of the simulation'
 population = read_simulation('simulation1.txt')
 flag = population['NAME']=='EKRAN_2_DEB'
 population = population[flag]
 
-print population['BC[m2/kg]'].min()
+#print population['BC[m2/kg]'].min()
 
 # SECOND STEP: create the cross-table
-
+print
+print 'Compute the cross-table'
 var_list = ['a[m]','i[deg]','RAAN[deg]','BC[m2/kg]']
-n_dim = 4
+n_dim = 5
 cross_table,frequencies,limits = pop_2_cross_table(population,var_list,n_dim)
-#print 'Cross-table'
-#print cross_table
+print 'Cross-table'
+print cross_table
 print 'Frequencies'
 print frequencies
 print 'Limits'
@@ -441,9 +455,10 @@ print limits
 print 
 
 # THIRD STEP: calculate the controls
+print
+print 'Compute the contraints'
 controls = read_controls('simulation1.txt',var_list,limits)
-print 'Controls'
-print controls
+print '> ',controls
 print 
 
 # FOURTH STEP: apply the IPF process
