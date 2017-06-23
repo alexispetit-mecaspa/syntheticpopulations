@@ -17,7 +17,7 @@ import numpy as np
 import sys
 import os
 from datetime import datetime
-from scipy.stats import norm
+from scipy.stats import norm,lognorm
 from random import random
 
 def read_simulation(name_file):
@@ -116,6 +116,7 @@ def read_controls(name_file,var_list,limits):
 
   #controls empty
   frequencies = {}
+  laws = {}
 
   #read the files containing the contraints
   f = open(name_file,'r')
@@ -142,12 +143,17 @@ def read_controls(name_file,var_list,limits):
     ax.grid(True)
     ax.set_title(var)
     #ax.hist(var_data,bins=25)
-    
-    mu, std = norm.fit(var_data)
     xmin =  limits[var][0]
     xmax =  limits[var][-1]
     x = np.linspace(xmin, xmax, 100)
-    p = norm.pdf(x,mu,std)
+    if var == 'BC[m2/kg]':
+      param = lognorm.fit(var_data)
+      laws[var] = param
+      p = lognorm.pdf(x,param[0])
+    else:
+      mu,std = norm.fit(var_data)
+      laws[var] = [mu,std]
+      p = norm.pdf(x,mu,std)
     ax.plot(x,p,'k',linewidth=2)
     ax.set_xlim([xmin,xmax])
 
@@ -156,7 +162,7 @@ def read_controls(name_file,var_list,limits):
   plt.savefig('controls')
   plt.close()
 
-  return frequencies
+  return frequencies,laws
 
 
 def create_controls(vmin,vmax,mu,std,nb_obj,limits):
@@ -181,30 +187,6 @@ def create_controls(vmin,vmax,mu,std,nb_obj,limits):
     
   return frequencies.tolist()
 
-
-def discretize(variable,n_dim):
-  """ Discretize a serie of data.
-
-  INPUT
-  -----
-
-  variable: dataframe
-  n_dim: integer
-
-  RETURN
-  ------
-
-  variable_discretized:
-
-  """
-
-  variable = variable.convert_objects(convert_numeric=True)
-  out = pd.cut(variable,n_dim)
-  counts = pd.value_counts(out)
-  variable_discretized = counts.reindex(out.cat.categories)
-  
-  return variable_discretized
-  
  
 def pop_2_cross_table(population,var_list,n_dim):
     """ Create the initial cross table.
@@ -234,26 +216,44 @@ def pop_2_cross_table(population,var_list,n_dim):
     k=0
     for var in var_list:
       population[var] = population[var].convert_objects(convert_numeric=True)
-      bounds[var],limits[var] = pd.cut(population[var],n_dim,retbins=True,labels=False)
+      bounds[var],limits[var] = pd.cut(population[var],n_dim[var],retbins=True,labels=False)
       counts = pd.value_counts(bounds[var])
       counts = [counts.loc[i] for i in range(0,len(counts),1)]
       frequencies[var] = counts
 
       ax = fig.add_subplot(2,2,k+1)
-      data_max = len(population[var])     
-      (mu, sigma) = norm.fit(population[var])
-      n, bins, patches = plt.hist(population[var],50,normed=1,facecolor='green',alpha=0.75)
-      y = mlab.normpdf(bins,mu,sigma)#*data_max
-      plt.plot(bins,y,'r--', linewidth=2)
-          
+      data_max = len(population[var])
+      
+      if var == 'BC[m2/kg]':
+        mu,sigma = norm.fit(population[var])
+        n, bins, patches = plt.hist(population[var],50,normed=1,facecolor='green',alpha=0.75)
+        p = mlab.normpdf(bins,mu,sigma)#*data_max
+        #plt.plot(bins,p,'r--',linewidth=2)
+        param = lognorm.fit(population[var])
+        xmin =  min(population[var])
+        xmax =  max(population[var])
+        x = np.linspace(xmin, xmax, 100)
+        p = lognorm.pdf(x,param[0])
+        plt.plot(x,p,'r--',linewidth=2)
+        #plt.plot(x,p,'k',linewidth=2)
+      else:
+        mu,sigma = norm.fit(population[var])
+        n, bins, patches = plt.hist(population[var],50,normed=1,facecolor='green',alpha=0.75)
+        p = mlab.normpdf(bins,mu,sigma)#*data_max
+        plt.plot(bins,p,'r--',linewidth=2)
+        
+      for i in range(0,n_dim[var]+1,1):
+        x = min(population[var])+((max(population[var])-min(population[var])))*i/n_dim[var]
+        plt.axvline(x, color='k', linestyle='--')
+
       k += 1
-      ax.grid(True)
+      #ax.grid(True)
       ax.set_title(var)
       
-    plt.savefig('new_frequencies')
+    plt.savefig('initial_frequencies')
     plt.close()
     
-    cross_table = np.zeros((n_dim,n_dim,n_dim,n_dim)) 
+    cross_table = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['BC[m2/kg]'])) 
     for i in range(0,len(limits['a[m]'])-1,1):
       for j in range(0,len(limits['i[deg]'])-1,1):
         for k in range(0,len(limits['RAAN[deg]'])-1,1):
@@ -294,10 +294,10 @@ def ipf_process(cross_table,frequencies,controls):
       cross_table,total = update_variable_cross_table(cross_table,frequencies,controls) 
       
       distance = 0
-      for i in range(0,n_dim,1):
-        for j in range(0,n_dim,1):
-          for k in range(0,n_dim,1):
-            for l in range(0,n_dim,1):
+      for i in range(0,n_dim['a[m]'],1):
+        for j in range(0,n_dim['i[deg]'],1):
+          for k in range(0,n_dim['RAAN[deg]'],1):
+            for l in range(0,n_dim['BC[m2/kg]'],1):
               distance += np.abs(cross_table[i,j,k,l]-cross_table_saved[i,j,k,l])
 
       list_distance.append(distance)          
@@ -402,7 +402,7 @@ def update_variable_cross_table(cross_table,frequency,controls):
   return cross_table,new_frequency
   
 
-def cross_table_2_pop(cross_table,frequencies,limits,var_list):
+def cross_table_2_pop(cross_table,frequencies,limits,laws,var_list):
   """ Convert the cross table to a population of objects
 
   """
@@ -413,11 +413,21 @@ def cross_table_2_pop(cross_table,frequencies,limits,var_list):
       for k in range(0,len(frequencies['RAAN[deg]']),1):
         for k in range(0,len(frequencies['RAAN[deg]']),1):
           counter = 0
+          sma = limits['a[m]'][i] + (limits['a[m]'][i+1]-limits['a[m]'][i])*random()
           while counter<cross_table[i,j,k,l]:
-            sma = limits['a[m]'][i] + (limits['a[m]'][i+1]-limits['a[m]'][i])*random()
+            while(True):
+              x = random()
+              inc = limits['i[deg]'][j] + (limits['i[deg]'][j+1]-limits['i[deg]'][j])*random()
+              p = norm(laws['i[deg]'][0], laws['i[deg]'][1]).pdf(inc)
+              if x<p:
+                break             
             ecc = 0.1*random()
-            inc = limits['i[deg]'][j] + (limits['i[deg]'][j+1]-limits['i[deg]'][j])*random()
-            raan = limits['RAAN[deg]'][k] + (limits['RAAN[deg]'][k+1]-limits['RAAN[deg]'][k])*random()        
+            while(True):
+              x = random()
+              raan = limits['RAAN[deg]'][j] + (limits['RAAN[deg]'][j+1]-limits['RAAN[deg]'][j])*random()
+              p = norm(laws['RAAN[deg]'][0], laws['RAAN[deg]'][1]).pdf(raan)
+              if x<p:
+                break
             omega = 360.*random()
             ma = 360.*random()
             bc = limits['BC[m2/kg]'][l] + (limits['BC[m2/kg]'][l+1]-limits['BC[m2/kg]'][l])*random()
@@ -444,7 +454,12 @@ population = population[flag]
 print
 print 'Compute the cross-table'
 var_list = ['a[m]','i[deg]','RAAN[deg]','BC[m2/kg]']
-n_dim = 5
+n_dim = {}
+n_dim['a[m]'] = 2
+n_dim['i[deg]'] = 2
+n_dim['RAAN[deg]'] = 2
+n_dim['BC[m2/kg]'] = 2
+
 cross_table,frequencies,limits = pop_2_cross_table(population,var_list,n_dim)
 print 'Cross-table'
 print cross_table
@@ -457,7 +472,7 @@ print
 # THIRD STEP: calculate the controls
 print
 print 'Compute the contraints'
-controls = read_controls('simulation1.txt',var_list,limits)
+controls,laws = read_controls('simulation1.txt',var_list,limits)
 print '> ',controls
 print 
 
@@ -468,15 +483,15 @@ new_cross_table = ipf_process(cross_table,frequencies,controls)
 
 #check total
 total = 0
-for i in range(0,n_dim,1):
-  for j in range(0,n_dim,1):
-    for k in range(0,n_dim,1):
-      for l in range(0,n_dim,1):
+for i in range(0,n_dim['a[m]'],1):
+  for j in range(0,n_dim['i[deg]'],1):
+    for k in range(0,n_dim['RAAN[deg]'],1):
+      for l in range(0,n_dim['BC[m2/kg]'],1):
         total += cross_table[i,j,k,l]
 print 'New total = ',total
 
 # FITH STEP: compute the synthetic population
-new_population = cross_table_2_pop(cross_table,frequencies,limits,var_list)
+new_population = cross_table_2_pop(cross_table,frequencies,limits,laws,var_list)
 raan = new_population['RAAN[deg]']
 inc = new_population['i[deg]']
 
@@ -486,8 +501,9 @@ plt.rc('ytick', labelsize=12)
 plt.ticklabel_format(style='sci',useOffset=False)
 plt.xlabel('RAAN [deg]',fontsize=14)
 plt.ylabel('i [deg]',fontsize=14)
-plt.plot(raan,inc,'o',markersize=2)   
-plt.xlim([0,360])
-plt.ylim([0,20])
+plt.plot(population['RAAN[deg]'],population['i[deg]'],'x',markersize=2,label='Synthetic population')
+plt.plot(raan,inc,'o',markersize=2,label='Simulation')   
+plt.xlim([290,340])
+plt.ylim([7,17])
 plt.savefig('synthetic_population')
 plt.close()
