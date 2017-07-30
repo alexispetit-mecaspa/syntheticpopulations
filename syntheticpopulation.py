@@ -69,23 +69,22 @@ def read_simulation(name_file):
   print '> ',category
   print
 
-  plt.title(date.strftime('%y/%m/%d'),fontsize=14)
-  plt.grid(True)
-  plt.rc('xtick', labelsize=12) 
-  plt.rc('ytick', labelsize=12) 
-  plt.ticklabel_format(style='sci',useOffset=False)
-  plt.xlabel('RAAN [deg]',fontsize=14)
-  plt.ylabel('i [deg]',fontsize=14)
+  fig, ax = plt.subplots()
+  ax.set_title(date.strftime('%y/%m/%d'),fontsize=14)
+  ax.set_xlabel('RAAN [deg]',fontsize=14)
+  ax.set_ylabel('i [deg]',fontsize=14)
+  ax.spines["top"].set_visible(False)
+  ax.spines["right"].set_visible(False)
 
   for name_selected in category:
     flag = population['NAME']==name_selected
     raan = population['RAAN[deg]'][flag]
     inc = population['i[deg]'][flag]
-    plt.plot(raan,inc,'o',markersize=2,label=name_selected.replace('_',' '))   
-  plt.xlim([0,360])
-  plt.ylim([0,20])
+    ax.plot(raan,inc,'o',markersize=2,label=name_selected.replace('_',' '))   
+  ax.set_xlim([0,360])
+  ax.set_ylim([0,20])
   plt.legend(loc='upper left',fontsize=14)
-  plt.savefig('simulation')
+  plt.savefig('set_simulation_1')
   plt.close()
   
   return population
@@ -120,12 +119,46 @@ def read_controls(name_file,var_list,limits,nb_obj):
   data = f.readlines()
   f.close()
 
+  yy = int(data[1].strip().split()[0])
+  mm = int(data[1].strip().split()[1])
+  dd = int(data[1].strip().split()[2])
+  hh = int(data[1].strip().split()[3])
+  mi = int(data[1].strip().split()[4])
+  ss = int(data[1].strip().split()[5])
+  date = datetime(yy,mm,dd,hh,mi,ss)
+
   headers = data[2].strip().split()
   population = []
   for row in data[3:]:
     if 'GEOTEST' not in row:
       population.append(row.strip().split())
   population = pd.DataFrame(population,columns=headers)
+
+  category = {}
+  for i in range(0,len(population)-1,1):
+    name = population.loc[i]['NAME']
+    if name not in category:
+        category[name] = 1
+    else:
+        category[name] += 1
+
+  fig, ax = plt.subplots()
+  ax.set_title(date.strftime('%y/%m/%d'),fontsize=14)
+  ax.set_xlabel('RAAN [deg]',fontsize=14)
+  ax.set_ylabel('i [deg]',fontsize=14)
+  ax.spines["top"].set_visible(False)
+  ax.spines["right"].set_visible(False)
+
+  for name_selected in category:
+    flag = population['NAME']==name_selected
+    raan = population['RAAN[deg]'][flag]
+    inc = population['i[deg]'][flag]
+    ax.plot(raan,inc,'o',markersize=2,label=name_selected.replace('_',' '))   
+  ax.set_xlim([0,360])
+  ax.set_ylim([0,20])
+  plt.legend(loc='upper left',fontsize=14)
+  plt.savefig('set_simulation_2')
+  plt.close()  
 
   print '> Plot the distribution (constraints)' 
   fig = plt.figure(figsize=(10,8))
@@ -139,6 +172,8 @@ def read_controls(name_file,var_list,limits,nb_obj):
     ax = fig.add_subplot(2,2,k+1)
     ax.grid(True)
     ax.set_title(var)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
     #ax.hist(var_data,bins=25)
     xmin =  limits[var][0]
     xmax =  limits[var][-1]
@@ -158,12 +193,86 @@ def read_controls(name_file,var_list,limits,nb_obj):
     ax.set_xlim([xmin,xmax])
 
     frequencies[var] = create_controls(var,xmin,xmax,mu,std,nb_obj,limits[var])
-    print 'freq',frequencies[var]
+    #print 'freq',frequencies[var]
     
   plt.savefig('controls')
   plt.close()
   
   return frequencies,laws
+
+
+def comparison_clouds(name1,name2,limit_raan,limit_inc):
+
+  #read the files containing the contraints
+  f = open(name1,'r')
+  data = f.readlines()
+  f.close()
+
+  yy = int(data[1].strip().split()[0])
+  mm = int(data[1].strip().split()[1])
+  dd = int(data[1].strip().split()[2])
+  hh = int(data[1].strip().split()[3])
+  mi = int(data[1].strip().split()[4])
+  ss = int(data[1].strip().split()[5])
+  date = datetime(yy,mm,dd,hh,mi,ss)
+
+  headers = data[2].strip().split()
+  population = []
+  for row in data[3:]:
+    if 'GEOTEST' not in row:
+      population.append(row.strip().split())
+  population = pd.DataFrame(population,columns=headers)
+
+  category = {}
+  for i in range(0,len(population)-1,1):
+    name = population.loc[i]['NAME']
+    if name not in category:
+        category[name] = 1
+    else:
+        category[name] += 1
+
+  fig, ax = plt.subplots()
+  ax.set_title(date.strftime('%y/%m/%d'),fontsize=14)
+  ax.set_xlabel('RAAN [deg]',fontsize=14)
+  ax.set_ylabel('i [deg]',fontsize=14)
+  ax.spines["top"].set_visible(False)
+  ax.spines["right"].set_visible(False)
+
+  flag = population['NAME']=='EKRAN_2_DEB'
+  raan = population['RAAN[deg]'][flag]
+  inc = population['i[deg]'][flag]
+  ax.plot(raan,inc,'o',markersize=2,label='Simulation 1')
+
+  #read the files containing the contraints
+  f = open(name2,'r')
+  data = f.readlines()
+  f.close()
+
+  headers = data[2].strip().split()
+  population = []
+  for row in data[3:]:
+    if 'GEOTEST' not in row:
+      population.append(row.strip().split())
+  population = pd.DataFrame(population,columns=headers)
+
+  category = {}
+  for i in range(0,len(population)-1,1):
+    name = population.loc[i]['NAME']
+    if name not in category:
+        category[name] = 1
+    else:
+        category[name] += 1
+
+  flag = population['NAME']=='EKRAN_2_DEB'
+  raan = population['RAAN[deg]'][flag]
+  inc = population['i[deg]'][flag]
+  ax.plot(raan,inc,'o',markersize=2,label='Simulation 2')
+    
+  ax.set_xlim(limit_raan)
+  ax.set_ylim(limit_inc)
+  plt.legend(loc='upper left',fontsize=14)
+  plt.savefig('comparison_simulation')
+  plt.close()    
 
 
 def create_controls(var,vmin,vmax,mu,std,nb_obj,limits):
@@ -224,29 +333,32 @@ def pop_2_cross_table(population,var_list,n_dim):
       frequencies[var] = counts
 
       ax = fig.add_subplot(2,2,k+1)
+      #ax.spines["top"].set_visible(False)
+      #ax.spines["right"].set_visible(False)
       data_max = len(population[var])
-      
+          
       if var == 'BC[m2/kg]':
         mu,sigma = norm.fit(population[var])
-        n, bins, patches = plt.hist(population[var],50,normed=1,facecolor='green',alpha=0.75)
+        #weights = np.ones_like(population[var])/float(len(population[var]))
+        n, bins, patches = plt.hist(population[var],50,facecolor='green',alpha=0.75,normed=1)#,weights=weights)
         p = mlab.normpdf(bins,mu,sigma)#*data_max
         #plt.plot(bins,p,'r--',linewidth=2)
         param = lognorm.fit(population[var])
         xmin =  min(population[var])
         xmax =  max(population[var])
-        x = np.linspace(xmin, xmax, 100)
+        x = np.linspace(xmin,xmax,50)
         p = lognorm.pdf(x,param[0])
         plt.plot(x,p,'r--',linewidth=2)
-        #plt.plot(x,p,'k',linewidth=2)
       else:
         mu,sigma = norm.fit(population[var])
-        n, bins, patches = plt.hist(population[var],50,normed=1,facecolor='green',alpha=0.75)
+        weights = np.ones_like(population[var])/float(len(population[var]))
+        n, bins, patches = plt.hist(population[var],50,facecolor='green',alpha=0.75,normed=1)#,weights=weights)
         p = mlab.normpdf(bins,mu,sigma)#*data_max
         plt.plot(bins,p,'r--',linewidth=2)
         
       for i in range(0,n_dim[var]+1,1):
         x = min(population[var])+((max(population[var])-min(population[var])))*i/n_dim[var]
-        plt.axvline(x, color='k', linestyle='--')
+        plt.axvline(x,color='k',linestyle='--')
 
       k += 1
       #ax.grid(True)
@@ -254,6 +366,7 @@ def pop_2_cross_table(population,var_list,n_dim):
       
     plt.savefig('initial_frequencies')
     plt.close()
+    #sys.exit()
     
     cross_table = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['BC[m2/kg]'])) 
     for i in range(0,len(limits['a[m]'])-1,1):
@@ -305,17 +418,20 @@ def ipf_process(cross_table,frequencies,controls):
       list_distance.append(distance)          
       counter += 1
 
-    print cross_table
+    #print cross_table
 
-    plt.grid(True)
-    plt.rc('xtick', labelsize=12) 
-    plt.rc('ytick', labelsize=12) 
-    plt.ticklabel_format(style='sci',useOffset=False)
-    plt.xlabel('Iteration',fontsize=14)
-    plt.ylabel('Distance',fontsize=14)
-    plt.xlim([0,len(list_distance)-1])
-    plt.yscale('log')
-    plt.plot(list_distance)   
+    fig, ax = plt.subplots()
+    ax.grid(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    #plt.rc('xtick', labelsize=12) 
+    #plt.rc('ytick', labelsize=12) 
+    #plt.ticklabel_format(style='sci',useOffset=False)
+    ax.set_xlabel('Iteration',fontsize=14)
+    ax.set_ylabel('Distance',fontsize=14)
+    ax.set_xlim([0,len(list_distance)-1])
+    ax.set_yscale('log')
+    ax.plot(list_distance)   
     plt.savefig('convergence')
     plt.close()   
       
@@ -348,12 +464,16 @@ def update_variable_cross_table(cross_table,frequency,controls):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):
         for l in range(0,len(frequency['BC[m2/kg]']),1):
-          cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['a[m]'][i]/frequency['a[m]'][i]
+          if frequency['a[m]'][i]==0:
+            cross_table[i,j,k,l]=0
+          else:
+            cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['a[m]'][i]/frequency['a[m]'][i]
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
           new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
   frequency = new_frequency.copy()
+  #print cross_table
   
   new_frequency = frequency.copy()
   for item in new_frequency:
@@ -363,12 +483,16 @@ def update_variable_cross_table(cross_table,frequency,controls):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):      
         for l in range(0,len(frequency['BC[m2/kg]']),1):
-          cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['i[deg]'][j]/frequency['i[deg]'][j]
+          if frequency['i[deg]'][j]==0:
+            cross_table[i,j,k,l] = 0
+          else:
+            cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['i[deg]'][j]/frequency['i[deg]'][j]
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]      
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
           new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
   frequency = new_frequency.copy() 
+  #print cross_table
   
   new_frequency = frequency.copy()
   for item in new_frequency:
@@ -378,12 +502,16 @@ def update_variable_cross_table(cross_table,frequency,controls):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):
         for l in range(0,len(frequency['BC[m2/kg]']),1):
-          cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['RAAN[deg]'][k]/frequency['RAAN[deg]'][k]
+          if frequency['RAAN[deg]'][k]==0:
+            cross_table[i,j,k,l] = 0
+          else:
+            cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['RAAN[deg]'][k]/frequency['RAAN[deg]'][k]
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]      
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
           new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
   frequency = new_frequency.copy()
+  #print cross_table
 
   new_frequency = frequency.copy()
   for item in new_frequency:
@@ -392,8 +520,11 @@ def update_variable_cross_table(cross_table,frequency,controls):
   for i in range(0,len(frequency['a[m]']),1):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):
-        for l in range(0,len(frequency['BC[m2/kg]']),1): 
-          cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['BC[m2/kg]'][l]/frequency['BC[m2/kg]'][l]
+        for l in range(0,len(frequency['BC[m2/kg]']),1):
+          if frequency['BC[m2/kg]'][l]==0:
+            cross_table[i,j,k,l] = 0
+          else:
+            cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['BC[m2/kg]'][l]/frequency['BC[m2/kg]'][l]
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]      
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
@@ -418,11 +549,14 @@ def cross_table_2_pop(cross_table,frequencies,limits,laws,var_list):
           while counter<cross_table[i,j,k,l]:
             sma = limits['a[m]'][i] + (limits['a[m]'][i+1]-limits['a[m]'][i])*random()
             while(True):
-              x = random()
-              inc = limits['i[deg]'][j] + (limits['i[deg]'][j+1]-limits['i[deg]'][j])*random()
-              p = norm(laws['i[deg]'][0], laws['i[deg]'][1]).pdf(inc)
-              if x<p:
-                break             
+              inc = np.random.normal(laws['i[deg]'][0],laws['i[deg]'][1],1)
+              if (inc>=limits['i[deg]'][j] and inc<limits['i[deg]'][j+1]):
+                break
+              #x = random()
+              #inc = limits['i[deg]'][j] + (limits['i[deg]'][j+1]-limits['i[deg]'][j])*random()
+              #p = norm(laws['i[deg]'][0], laws['i[deg]'][1]).pdf(inc)
+              #if x<p:
+              #  break             
             ecc = 0.1*random()
             while(True):
               x = random()
@@ -451,20 +585,20 @@ if __name__ == "__main__":
   population = read_simulation('simulation1.txt')
   flag = population['NAME']=='EKRAN_2_DEB'
   population = population[flag]
-
+  
   # SECOND STEP: create the cross-table
   print
   print 'Compute the cross-table'
   var_list = ['a[m]','i[deg]','RAAN[deg]','BC[m2/kg]']
   n_dim = {}
-  n_dim['a[m]'] = 1
-  n_dim['i[deg]'] = 4
-  n_dim['RAAN[deg]'] = 3
-  n_dim['BC[m2/kg]'] = 1
+  n_dim['a[m]'] = 5
+  n_dim['i[deg]'] = 7
+  n_dim['RAAN[deg]'] = 7
+  n_dim['BC[m2/kg]'] = 3
 
   cross_table,frequencies,limits = pop_2_cross_table(population,var_list,n_dim)
-  print 'Cross-table'
-  print cross_table
+  #print 'Cross-table'
+  #print cross_table
   print 'Frequencies'
   print frequencies
   print 'Limits'
@@ -472,7 +606,7 @@ if __name__ == "__main__":
   print
 
   # THIRD STEP: calculate the controls
-  nb_obj = 400
+  nb_obj = 460*2
   print
   print 'Compute the contraints'
   controls,laws = read_controls('simulation1.txt',var_list,limits,nb_obj)
@@ -491,32 +625,36 @@ if __name__ == "__main__":
       for k in range(0,n_dim['RAAN[deg]'],1):
         for l in range(0,n_dim['BC[m2/kg]'],1):
           total += cross_table[i,j,k,l]
-  print 'New total = ',total
+  #print 'New total = ',total
 
   # FITH STEP: compute the synthetic population
   new_population = cross_table_2_pop(cross_table,frequencies,limits,laws,var_list)
   raan = new_population['RAAN[deg]']
   inc = new_population['i[deg]']
 
-  #plt.grid(True)
-  plt.rc('xtick', labelsize=12) 
-  plt.rc('ytick', labelsize=12) 
-  plt.ticklabel_format(style='sci',useOffset=False)
-  plt.xlabel('RAAN [deg]',fontsize=14)
-  plt.ylabel('i [deg]',fontsize=14)
-  plt.plot(population['RAAN[deg]'],population['i[deg]'],'x',markersize=2,label='Synthetic population')
-  plt.plot(raan,inc,'o',markersize=2,label='Simulation')
+  fig, ax = plt.subplots()
+  ax.set_xlabel('RAAN [deg]',fontsize=14)
+  ax.set_ylabel('i [deg]',fontsize=14)
+  ax.spines["top"].set_visible(False)
+  ax.spines["right"].set_visible(False)  
+  ax.plot(population['RAAN[deg]'],population['i[deg]'],'x',markersize=2,label='Simulation ('+str(len(population))+' fragments)',alpha=0.7)
+  ax.plot(raan,inc,'o',markersize=2,label='Synthetic population ('+str(len(raan))+' fragments)',alpha=0.7)
   for j in range(0,n_dim['i[deg]'],1):
     x = limits['i[deg]'][j]
-    plt.axhline(x, color='k', linestyle='--')
+    ax.axhline(x, color='k', linestyle='--')
   x = limits['i[deg]'][j+1]
-  plt.axhline(x, color='k', linestyle='--')
+  ax.axhline(x, color='k', linestyle='--')
   for k in range(0,n_dim['RAAN[deg]'],1):
     x = limits['RAAN[deg]'][k]
-    plt.axvline(x, color='k', linestyle='--')
+    ax.axvline(x, color='k', linestyle='--')
   x = limits['RAAN[deg]'][k+1]
-  plt.axvline(x, color='k', linestyle='--')
-  plt.xlim([290,340])
-  plt.ylim([7,17])
+  ax.axvline(x, color='k', linestyle='--')
+  ax.set_xlim([limits['RAAN[deg]'][0],limits['RAAN[deg]'][k+1]])
+  ax.set_ylim([limits['i[deg]'][0],limits['i[deg]'][j+1]])
+  plt.legend(loc='upper left',fontsize=12)
   plt.savefig('synthetic_population')
   plt.close()
+
+  limit_raan = [limits['RAAN[deg]'][0],limits['RAAN[deg]'][k+1]]
+  limit_inc = [limits['i[deg]'][0],limits['i[deg]'][j+1]]
+  comparison_clouds('simulation1.txt','simulation2.txt',limit_raan,limit_inc)
