@@ -533,6 +533,53 @@ def update_variable_cross_table(cross_table,frequency,controls):
 
   
   return cross_table,new_frequency
+
+def trs(cross_table,n_dim,nb_obj):
+
+  new_cross_table = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['BC[m2/kg]'])) 
+  weight = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['BC[m2/kg]']))
+  sum_weight = 0
+
+  total = 0
+  for i in range(0,n_dim['a[m]'],1):
+    for j in range(0,n_dim['i[deg]'],1):
+      for k in range(0,n_dim['RAAN[deg]'],1):
+        for l in range(0,n_dim['BC[m2/kg]'],1):
+          new_cross_table[i,j,k,l] += int(cross_table[i,j,k,l])
+          total += new_cross_table[i,j,k,l] 
+          weight[i,j,k,l] = cross_table[i,j,k,l] - new_cross_table[i,j,k,l]
+          sum_weight += weight[i,j,k,l]
+
+  bound = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['BC[m2/kg]']))         
+  sum_bound = 0      
+  for i in range(0,n_dim['a[m]'],1):
+    for j in range(0,n_dim['i[deg]'],1):
+      for k in range(0,n_dim['RAAN[deg]'],1):
+        for l in range(0,n_dim['BC[m2/kg]'],1):
+          weight[i,j,k,l] = weight[i,j,k,l]/sum_weight
+          sum_bound += weight[i,j,k,l]
+          bound[i,j,k,l] = sum_bound
+
+  while (total<nb_obj):
+    flag = False
+    for i in range(0,n_dim['a[m]'],1):
+      for j in range(0,n_dim['i[deg]'],1):
+        for k in range(0,n_dim['RAAN[deg]'],1):
+          for l in range(0,n_dim['BC[m2/kg]'],1):
+            if bound[i,j,k,l] > random():
+               new_cross_table[i,j,k,l] +=1
+               total += 1
+               flag = True
+            if flag:
+              break
+          if flag:
+            break
+        if flag:
+          break
+      if flag:
+        break
+      
+  return new_cross_table
   
 
 def cross_table_2_pop(cross_table,frequencies,limits,laws,var_list):
@@ -617,7 +664,10 @@ if __name__ == "__main__":
   new_cross_table = ipf_process(cross_table,frequencies,controls)
   #print 'New cross-table'
   #print cross_table
-
+  
+  # TRS process
+  cross_table = trs(new_cross_table,n_dim,nb_obj)
+  
   #check total
   total = 0
   for i in range(0,n_dim['a[m]'],1):
@@ -625,7 +675,7 @@ if __name__ == "__main__":
       for k in range(0,n_dim['RAAN[deg]'],1):
         for l in range(0,n_dim['BC[m2/kg]'],1):
           total += cross_table[i,j,k,l]
-  #print 'New total = ',total
+  print 'New total = ',total
 
   # FITH STEP: compute the synthetic population
   new_population = cross_table_2_pop(cross_table,frequencies,limits,laws,var_list)
