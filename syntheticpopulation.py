@@ -20,6 +20,7 @@ from datetime import datetime
 from scipy.stats import norm,lognorm
 from random import random
 
+
 def read_simulation(name_file):
   """ Read the snapshot of a simulation of the space debris environment.
 
@@ -54,8 +55,9 @@ def read_simulation(name_file):
   for row in data[3:]:
     if 'GEOTEST' not in row:
       population.append(row.strip().split())
-  population = pd.DataFrame(population,columns=headers)    
-
+  population = pd.DataFrame(population,columns=headers)
+  population['A/M[m2/kg]'] = population['BC[m2/kg]'].astype('float64')/2.2
+  
   category = {}
   for i in range(0,len(population)-1,1):
     name = population.loc[i]['NAME']
@@ -133,7 +135,8 @@ def read_controls(name_file,var_list,limits,nb_obj):
     if 'GEOTEST' not in row:
       population.append(row.strip().split())
   population = pd.DataFrame(population,columns=headers)
-
+  population['A/M[m2/kg]'] = population['BC[m2/kg]'].astype('float64')/2.2
+  
   category = {}
   for i in range(0,len(population)-1,1):
     name = population.loc[i]['NAME']
@@ -178,7 +181,7 @@ def read_controls(name_file,var_list,limits,nb_obj):
     xmin =  limits[var][0]
     xmax =  limits[var][-1]
     x = np.linspace(xmin, xmax, 100)
-    if var == 'BC[m2/kg]':
+    if var == 'A/M[m2/kg]':
       #param = lognorm.fit(var_data)
       #laws[var] = param
       #p = lognorm.pdf(x,param[0])
@@ -222,7 +225,8 @@ def comparison_clouds(name1,name2,limit_raan,limit_inc):
     if 'GEOTEST' not in row:
       population.append(row.strip().split())
   population = pd.DataFrame(population,columns=headers)
-
+  population['A/M[m2/kg]'] = population['BC[m2/kg]']
+  
   category = {}
   for i in range(0,len(population)-1,1):
     name = population.loc[i]['NAME']
@@ -283,7 +287,7 @@ def create_controls(var,vmin,vmax,mu,std,nb_obj,limits):
   counter = 0
   pop = []
   while(len(pop)<nb_obj):
-    if var=='BC[m2/kg]':
+    if var=='A/M[m2/kg]':
       x = np.random.normal(loc=mu,scale=std)
     else:
       x = np.random.normal(loc=mu,scale=std)
@@ -337,7 +341,7 @@ def pop_2_cross_table(population,var_list,n_dim):
       #ax.spines["right"].set_visible(False)
       data_max = len(population[var])
           
-      if var == 'BC[m2/kg]':
+      if var == 'A/M[m2/kg]':
         mu,sigma = norm.fit(population[var])
         #weights = np.ones_like(population[var])/float(len(population[var]))
         n, bins, patches = plt.hist(population[var],50,facecolor='green',alpha=0.75,normed=1)#,weights=weights)
@@ -368,12 +372,12 @@ def pop_2_cross_table(population,var_list,n_dim):
     plt.close()
     #sys.exit()
     
-    cross_table = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['BC[m2/kg]'])) 
+    cross_table = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['A/M[m2/kg]'])) 
     for i in range(0,len(limits['a[m]'])-1,1):
       for j in range(0,len(limits['i[deg]'])-1,1):
         for k in range(0,len(limits['RAAN[deg]'])-1,1):
-          for l in range(0,len(limits['BC[m2/kg]'])-1,1):
-            flag = (bounds['a[m]']==i) & (bounds['i[deg]']==j) & (bounds['RAAN[deg]']==k) & (bounds['BC[m2/kg]']==l)
+          for l in range(0,len(limits['A/M[m2/kg]'])-1,1):
+            flag = (bounds['a[m]']==i) & (bounds['i[deg]']==j) & (bounds['RAAN[deg]']==k) & (bounds['A/M[m2/kg]']==l)
             cross_table[i,j,k,l] = len(population[flag])
       
     return cross_table,frequencies,limits
@@ -412,7 +416,7 @@ def ipf_process(cross_table,frequencies,controls):
       for i in range(0,n_dim['a[m]'],1):
         for j in range(0,n_dim['i[deg]'],1):
           for k in range(0,n_dim['RAAN[deg]'],1):
-            for l in range(0,n_dim['BC[m2/kg]'],1):
+            for l in range(0,n_dim['A/M[m2/kg]'],1):
               distance += np.abs(cross_table[i,j,k,l]-cross_table_saved[i,j,k,l])
 
       list_distance.append(distance)          
@@ -463,7 +467,7 @@ def update_variable_cross_table(cross_table,frequency,controls):
   for i in range(0,len(frequency['a[m]']),1):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):
-        for l in range(0,len(frequency['BC[m2/kg]']),1):
+        for l in range(0,len(frequency['A/M[m2/kg]']),1):
           if frequency['a[m]'][i]==0:
             cross_table[i,j,k,l]=0
           else:
@@ -471,7 +475,7 @@ def update_variable_cross_table(cross_table,frequency,controls):
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
-          new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
+          new_frequency['A/M[m2/kg]'][l] += cross_table[i,j,k,l]
   frequency = new_frequency.copy()
   #print cross_table
   
@@ -482,7 +486,7 @@ def update_variable_cross_table(cross_table,frequency,controls):
   for i in range(0,len(frequency['a[m]']),1):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):      
-        for l in range(0,len(frequency['BC[m2/kg]']),1):
+        for l in range(0,len(frequency['A/M[m2/kg]']),1):
           if frequency['i[deg]'][j]==0:
             cross_table[i,j,k,l] = 0
           else:
@@ -490,7 +494,7 @@ def update_variable_cross_table(cross_table,frequency,controls):
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]      
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
-          new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
+          new_frequency['A/M[m2/kg]'][l] += cross_table[i,j,k,l]
   frequency = new_frequency.copy() 
   #print cross_table
   
@@ -501,7 +505,7 @@ def update_variable_cross_table(cross_table,frequency,controls):
   for i in range(0,len(frequency['a[m]']),1):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):
-        for l in range(0,len(frequency['BC[m2/kg]']),1):
+        for l in range(0,len(frequency['A/M[m2/kg]']),1):
           if frequency['RAAN[deg]'][k]==0:
             cross_table[i,j,k,l] = 0
           else:
@@ -509,7 +513,7 @@ def update_variable_cross_table(cross_table,frequency,controls):
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]      
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
-          new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
+          new_frequency['A/M[m2/kg]'][l] += cross_table[i,j,k,l]
   frequency = new_frequency.copy()
   #print cross_table
 
@@ -520,15 +524,15 @@ def update_variable_cross_table(cross_table,frequency,controls):
   for i in range(0,len(frequency['a[m]']),1):
     for j in range(0,len(frequency['i[deg]']),1):
       for k in range(0,len(frequency['RAAN[deg]']),1):
-        for l in range(0,len(frequency['BC[m2/kg]']),1):
-          if frequency['BC[m2/kg]'][l]==0:
+        for l in range(0,len(frequency['A/M[m2/kg]']),1):
+          if frequency['A/M[m2/kg]'][l]==0:
             cross_table[i,j,k,l] = 0
           else:
-            cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['BC[m2/kg]'][l]/frequency['BC[m2/kg]'][l]
+            cross_table[i,j,k,l] = cross_table[i,j,k,l]*controls['A/M[m2/kg]'][l]/frequency['A/M[m2/kg]'][l]
           new_frequency['a[m]'][i] += cross_table[i,j,k,l]
           new_frequency['i[deg]'][j] += cross_table[i,j,k,l]      
           new_frequency['RAAN[deg]'][k] += cross_table[i,j,k,l]
-          new_frequency['BC[m2/kg]'][l] += cross_table[i,j,k,l]
+          new_frequency['A/M[m2/kg]'][l] += cross_table[i,j,k,l]
   frequency = new_frequency.copy()
 
   
@@ -536,26 +540,26 @@ def update_variable_cross_table(cross_table,frequency,controls):
 
 def trs(cross_table,n_dim,nb_obj):
 
-  new_cross_table = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['BC[m2/kg]'])) 
-  weight = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['BC[m2/kg]']))
+  new_cross_table = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['A/M[m2/kg]'])) 
+  weight = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['A/M[m2/kg]']))
   sum_weight = 0
 
   total = 0
   for i in range(0,n_dim['a[m]'],1):
     for j in range(0,n_dim['i[deg]'],1):
       for k in range(0,n_dim['RAAN[deg]'],1):
-        for l in range(0,n_dim['BC[m2/kg]'],1):
+        for l in range(0,n_dim['A/M[m2/kg]'],1):
           new_cross_table[i,j,k,l] += int(cross_table[i,j,k,l])
           total += new_cross_table[i,j,k,l] 
           weight[i,j,k,l] = cross_table[i,j,k,l] - new_cross_table[i,j,k,l]
           sum_weight += weight[i,j,k,l]
 
-  bound = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['BC[m2/kg]']))         
+  bound = np.zeros((n_dim['a[m]'],n_dim['i[deg]'],n_dim['RAAN[deg]'],n_dim['A/M[m2/kg]']))         
   sum_bound = 0      
   for i in range(0,n_dim['a[m]'],1):
     for j in range(0,n_dim['i[deg]'],1):
       for k in range(0,n_dim['RAAN[deg]'],1):
-        for l in range(0,n_dim['BC[m2/kg]'],1):
+        for l in range(0,n_dim['A/M[m2/kg]'],1):
           weight[i,j,k,l] = weight[i,j,k,l]/sum_weight
           sum_bound += weight[i,j,k,l]
           bound[i,j,k,l] = sum_bound
@@ -565,8 +569,8 @@ def trs(cross_table,n_dim,nb_obj):
     for i in range(0,n_dim['a[m]'],1):
       for j in range(0,n_dim['i[deg]'],1):
         for k in range(0,n_dim['RAAN[deg]'],1):
-          for l in range(0,n_dim['BC[m2/kg]'],1):
-            if bound[i,j,k,l] > random():
+          for l in range(0,n_dim['A/M[m2/kg]'],1):
+            if (bound[i,j,k,l] > random()) and new_cross_table[i,j,k,l]!=0:
                new_cross_table[i,j,k,l] +=1
                total += 1
                flag = True
@@ -591,7 +595,7 @@ def cross_table_2_pop(cross_table,frequencies,limits,laws,var_list):
   for i in range(0,len(frequencies['a[m]']),1):
     for j in range(0,len(frequencies['i[deg]']),1):
       for k in range(0,len(frequencies['RAAN[deg]']),1):
-        for l in range(0,len(frequencies['BC[m2/kg]']),1):
+        for l in range(0,len(frequencies['A/M[m2/kg]']),1):
           counter = 0
           while counter<cross_table[i,j,k,l]:
             sma = limits['a[m]'][i] + (limits['a[m]'][i+1]-limits['a[m]'][i])*random()
@@ -613,12 +617,12 @@ def cross_table_2_pop(cross_table,frequencies,limits,laws,var_list):
                 break
             omega = 360.*random()
             ma = 360.*random()
-            bc = limits['BC[m2/kg]'][l] + (limits['BC[m2/kg]'][l+1]-limits['BC[m2/kg]'][l])*random()
+            bc = limits['A/M[m2/kg]'][l] + (limits['A/M[m2/kg]'][l+1]-limits['A/M[m2/kg]'][l])*random()
             population.append([sma,ecc,inc,raan,omega,ma,bc])
             counter += 1
   
-  #['a[m]', 'e[-]', 'i[deg]', 'RAAN[deg]', 'Omega[deg]', 'MA[deg]', 'BC[m2/kg]', 'S[m]', 'IDNORAD', 'NAME']      
-  headers = ['a[m]', 'e[-]', 'i[deg]', 'RAAN[deg]', 'Omega[deg]', 'MA[deg]', 'BC[m2/kg]']
+  #['a[m]', 'e[-]', 'i[deg]', 'RAAN[deg]', 'Omega[deg]', 'MA[deg]', 'A/M[m2/kg]', 'S[m]', 'IDNORAD', 'NAME']      
+  headers = ['a[m]', 'e[-]', 'i[deg]', 'RAAN[deg]', 'Omega[deg]', 'MA[deg]', 'A/M[m2/kg]']
   population = pd.DataFrame(population,columns=headers) 
         
   return population
@@ -636,16 +640,16 @@ if __name__ == "__main__":
   # SECOND STEP: create the cross-table
   print
   print 'Compute the cross-table'
-  var_list = ['a[m]','i[deg]','RAAN[deg]','BC[m2/kg]']
+  var_list = ['a[m]','i[deg]','RAAN[deg]','A/M[m2/kg]']
   n_dim = {}
-  n_dim['a[m]'] = 5
+  n_dim['a[m]'] = 4
   n_dim['i[deg]'] = 7
   n_dim['RAAN[deg]'] = 7
-  n_dim['BC[m2/kg]'] = 3
+  n_dim['A/M[m2/kg]'] = 3
 
   cross_table,frequencies,limits = pop_2_cross_table(population,var_list,n_dim)
-  #print 'Cross-table'
-  #print cross_table
+  print 'Cross-table'
+  print cross_table
   print 'Frequencies'
   print frequencies
   print 'Limits'
@@ -653,27 +657,28 @@ if __name__ == "__main__":
   print
 
   # THIRD STEP: calculate the controls
-  nb_obj = 460*2
+  nb_obj = 460#*2
   print
   print 'Compute the contraints'
-  controls,laws = read_controls('simulation1.txt',var_list,limits,nb_obj)
+  controls,laws = read_controls('simulation2.txt',var_list,limits,nb_obj)
   print '> ',controls
   print 
 
   # FOURTH STEP: apply the IPF process
   new_cross_table = ipf_process(cross_table,frequencies,controls)
-  #print 'New cross-table'
-  #print cross_table
+  print 'New cross-table'
+  print cross_table
   
   # TRS process
   cross_table = trs(new_cross_table,n_dim,nb_obj)
+  #cross_table = new_cross_table
   
   #check total
   total = 0
   for i in range(0,n_dim['a[m]'],1):
     for j in range(0,n_dim['i[deg]'],1):
       for k in range(0,n_dim['RAAN[deg]'],1):
-        for l in range(0,n_dim['BC[m2/kg]'],1):
+        for l in range(0,n_dim['A/M[m2/kg]'],1):
           total += cross_table[i,j,k,l]
   print 'New total = ',total
 
